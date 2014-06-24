@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Commute-timer</title>
+<script language="javascript">
+	var commute_started = false;
+	var legs = [];
+	var div_commute_status, span_start_time, span_elapsed_time;
+	var div_leg_status, span_leg_mode, span_leg_elapsed_time;
+	var div_transit_mode_buttons;
+	var htimer;
+
+	function now () {
+		var d = new Date();
+		return d.getTime();
+	}
+	function zero_pad_digit(val) {
+		if (val < 10) {
+			return "0" + val;
+		} else {
+			return "" + val;
+		}
+	}
+	function format_time(date_obj) {
+		return zero_pad_digit(date_obj.getHours()) + ":" +
+					 zero_pad_digit(date_obj.getMinutes()) + ":" +
+					 zero_pad_digit(date_obj.getSeconds());
+	}
+	function format_difference(msec_ts1, msec_ts2) {
+		var sec = Math.floor((msec_ts2 - msec_ts1) / 1000);
+		var hours = Math.floor(sec / 3600);
+		sec = sec % 3600;
+		var minutes = Math.floor(sec / 60);
+		sec = sec % 60;
+		return zero_pad_digit(hours) + ":" +
+					 zero_pad_digit(minutes) + ":" +
+					 zero_pad_digit(sec);
+	}
+	function timer()
+	{
+		update_elapsed_time();
+		update_leg_mode();
+		update_leg_elapsed_time();
+		htimer = window.setTimeout(timer, 1000);
+	}
+	function update_start_time () {
+		if (commute_started) {
+			var start_time = legs[0].start;
+			var date_obj = new Date(start_time);
+			span_start_time.innerHTML = format_time(date_obj);
+		}
+	}
+	function update_elapsed_time() {
+		if (commute_started) {
+			var start_time = legs[0].start;
+			span_elapsed_time.innerHTML = format_difference(start_time, now());
+		}
+	}
+	function update_leg_mode() {
+		if (commute_started) {
+			span_leg_mode.innerHTML = legs[legs.length-1].mode;
+		}
+	}
+	function update_leg_elapsed_time() {
+		if (commute_started) {
+			var leg_start_time = legs[legs.length-1].start;
+			span_leg_elapsed_time.innerHTML = format_difference(leg_start_time, now());
+		}
+	}
+	function transit_mode_click_handler (mode) {
+		console.log("click handler for " + mode);
+		window.clearTimeout(htimer);
+		
+		legs.push({
+			mode : mode,
+			start : now()
+		});
+
+		if (!commute_started) {
+			commute_started = true;
+			update_start_time();
+			show_status();
+		}
+		timer();
+	}
+	function establish_transit_mode_click_handlers () {
+		var mode_elems = div_transit_mode_buttons.children;
+		for (var i=0;i<mode_elems.length;i++)
+		{
+			mode_elems[i].onclick = function (ev) {
+				transit_mode_click_handler(this.value);
+			};
+		}
+	}
+	function hide_status() {
+		div_commute_status.hidden = true;
+		div_leg_status.hidden = true;
+	}
+	function show_status() {
+		div_commute_status.hidden = false;
+		div_leg_status.hidden = false;
+	}
+	window.onload = function () {
+		div_commute_status = document.getElementById('commute-status');
+		span_start_time = document.getElementById('start-time');
+		span_elapsed_time = document.getElementById('elapsed-time');
+		div_leg_status = document.getElementById('leg-status');
+		span_leg_mode = document.getElementById('leg-mode');
+		span_leg_elapsed_time = document.getElementById('leg-elapsed-time');
+		div_transit_mode_buttons = document.getElementById('transit-mode-buttons')
+
+		hide_status();
+
+		establish_transit_mode_click_handlers();
+	}
+</script>
+</head>
+<body>
+<center>
+	<div id="commute-status">
+		En route since <span id="start-time"></span>.
+		<span id="elapsed-time"></span>
+	</div>
+	<div id="leg-status">
+		Travelling via <span id="leg-mode"></span> for
+		<span id="leg-elapsed-time"></span>
+	</div>
+	<div id="transit-mode-buttons">
+		<input type="button" value="walk">
+		<input type="button" value="bike">
+		<input type="button" value="rail">
+		<input type="button" value="light rail">
+		<input type="button" value="drive">
+		<input type="button" value="skate">
+	</div>
+</center>
+</body>
+</html>

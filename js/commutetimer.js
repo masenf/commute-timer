@@ -1,3 +1,53 @@
+function Localism(key, locale) {
+  /* base_strings fallback when there is no specific
+   * translation, use these for the basis of translation */
+  base_strings = {
+    app_name: "CommuteTimer",
+    arrival_text: "You are arrived",
+    arrival_subtext: "Remember to have a nice day",
+    been_commuting: "Been commuting for",
+    btn_abandon: "Abandon",
+    btn_arrive: "Arrival",
+    btn_reset: "Reset",
+    data_tab: "Datar",
+    en_route: "En route via",
+    prestart_text: "Haven't started yet",
+    prestart_subtext: "Press one of the transit mode buttons below to start timing your commute",
+    default_modes: [
+      ['walk', 'walking', 'on foot'],
+      ['bike', 'biking', 'pedaling'],
+      ['bus', 'riding', 'on the bus'],
+      ['rail', 'riding', 'on the train'],
+      ['light rail', 'riding', 'light railing'],
+      ['drive', 'driving', 'en route via automobile'],
+      ['skate', 'skating', 'shreading'],
+      ['wait', 'waiting', 'counting the seconds']
+    ],
+    settings_tab: "Settings",
+    setting_str_label: "label",
+    setting_str_verb: "verb",
+    setting_str_phrase: "phrase",
+    setting_str_up: "up",
+    setting_str_down: "down",
+    started_at: "Started at",
+    str_for: "for",
+    timer_tab: "Timer"
+  };
+  return base_strings[key];
+}
+function static_localize() {
+  /* called once the DOM is constructed to replace
+   * span elements prefixed with loc_ with their localized
+   * equivalents */
+  var spans = document.getElementsByTagName("span");
+  for(var i=0; i<spans.length; i++) {
+    if(spans[i].id && spans[i].id.indexOf('loc_') == 0) {
+        var key = spans[i].id.slice(4);
+        console.log("localizing " + key);
+        spans[i].innerHTML = Localism(key);
+    }
+  }
+}
 function supportLocalStorage() {
   try {
     return 'localStorage' in window && window['localStorage'] !== null;
@@ -46,7 +96,7 @@ function update_current_time () {
   p_current_time.innerHTML = format_time(new Date());
   window.setTimeout(update_current_time, 1000);
 }
-function CommuteTimer()
+function CommuteTimer(settings)
 {
   var commutetimer = {
     support_data_version: 0,
@@ -59,6 +109,7 @@ function CommuteTimer()
     span_elapsed_time: document.getElementById('elapsed-time'),
     div_transit_mode_buttons: document.getElementById('transit-mode-buttons'),
     div_commute_tools: document.getElementById('commute-tools'),
+    table_commute_legs: document.getElementById('commute-legs'),
     btn_arrive: document.getElementById('btn-arrive'),
     btn_abandon: document.getElementById('btn-abandon'),
 
@@ -82,10 +133,11 @@ function CommuteTimer()
     update_leg_mode: function () {
       if (this.data.commute_started) {
         var mode = this.data.legs[this.data.legs.length-1].mode;
-        if (mode == "wait") {
-          this.set_status("Just waiting...");
+        var modeline = this.settings.mode_map[mode];
+        if (modeline) {
+          this.set_status(modeline[2]);
         } else {
-          this.set_status("En route via " + mode);
+          this.set_status(Localism("en_route") + " " + mode);
         }
       }
     },
@@ -93,7 +145,16 @@ function CommuteTimer()
     update_leg_elapsed_time: function () {
       if (this.data.commute_started) {
         var leg_start_time = this.data.legs[this.data.legs.length-1].start;
-        this.set_subtext("for " + format_difference(leg_start_time, now()));
+        var mode = this.data.legs[this.data.legs.length-1].mode;
+        var modeline = this.settings.mode_map[mode];
+        var subtext = "";
+        if (modeline) {
+          subtext = subtext + modeline[1] + " ";
+        }
+        subtext = subtext +
+                  Localism("str_for") + " " +
+                  format_difference(leg_start_time, now());
+        this.set_subtext(subtext);
       }
     },
 
@@ -117,11 +178,12 @@ function CommuteTimer()
       this.show_status();
     },
     arrive_commute: function () {
+      this.transit_mode_click_handler("arrive");
       this.data.commute_started = false;
       window.clearTimeout(this.timer_handle);
-      this.set_status("You are arrived");
-      this.set_subtext("Remember to Have a nice Day");
-      this.btn_arrive.value = "Reset";
+      this.set_status(Localism("arrival_text"));
+      this.set_subtext(Localism("arrival_subtext"));
+      this.btn_arrive.value = Localism("btn_reset");
       var parent = this;
       this.btn_arrive.onclick = function () {
         parent.abandon_commute();
@@ -140,20 +202,13 @@ function CommuteTimer()
 
       if (!this.data.commute_started) {
         this.start_commute();
+      } else {
+        // add the previous leg to the table
+        this.append_prev_leg();
       }
+
       this.timer();
       this.freeze_state();
-    },
-
-    establish_transit_mode_click_handlers: function () {
-      var parent = this;
-      var mode_elems = this.div_transit_mode_buttons.children;
-      for (var i=0;i<mode_elems.length;i++)
-      {
-        mode_elems[i].onclick = function (ev) {
-          parent.transit_mode_click_handler(this.value);
-        };
-      }
     },
 
     show_status: function() {
@@ -169,21 +224,51 @@ function CommuteTimer()
       this.data = {
         data_version: 0,
         commute_started: false,
-        status_message: "Haven't started yet",
-        subtext: "Press one of the transit mode buttons below to start timing your commute",
+        status_message: Localism("prestart_text"),
+        subtext: Localism("prestart_subtext"),
         legs: [],
       };
       window.clearTimeout(this.timer_handle);
       var parent = this;
       this.btn_abandon.disabled = false;
+      this.btn_abandon.value = Localism("btn_abandon");
       this.btn_abandon.onclick = function () {
         parent.abandon_commute();
       };
-      this.btn_arrive.value = "Arrival";
+      this.btn_arrive.value = Localism("btn_arrive");
       this.btn_arrive.onclick = function () {
         parent.arrive_commute();
       };
+      this.table_commute_legs.innerHTML = "";
       this.hide_status();
+    },
+    append_prev_leg: function ()
+    {
+      var prev_leg = this.data.legs[this.data.legs.length-2]
+      this.append_table_leg(prev_leg.mode,
+                            format_time(new Date(prev_leg.start)),
+                            format_difference(prev_leg.start, now()));
+    },
+    append_table_leg: function (mode, start_time, duration)
+    {
+      var row = this.table_commute_legs.insertRow(this.table_commute_legs.rows.length);
+      var mode_cell = row.insertCell(0);
+      mode_cell.innerHTML = mode;
+      var start_time_cell = row.insertCell(1);
+      start_time_cell.innerHTML = start_time;
+      var duration_cell = row.insertCell(2);
+      duration_cell.innerHTML = duration;
+    },
+    thaw_rebuild_leg_table: function ()
+    {
+      for (var i=0;i<this.data.legs.length-1;i++)
+      {
+        var leg = this.data.legs[i];
+        var next_leg = this.data.legs[i+1];
+        this.append_table_leg(leg.mode,
+                              format_time(new Date(leg.start)),
+                              format_difference(leg.start, next_leg.start));
+      }
     },
     thaw_state: function () {
       if (supportLocalStorage())
@@ -198,6 +283,7 @@ function CommuteTimer()
             {
               this.data = fdata;
               this.start_commute();
+              this.thaw_rebuild_leg_table();
               this.timer();
             }
           }
@@ -232,12 +318,127 @@ function CommuteTimer()
     commutetimer.update_leg_elapsed_time();
     commutetimer.timer_handle = window.setTimeout(commutetimer.timer, 1000);
   };
+  commutetimer.settings = settings;
   commutetimer.reset_state();
-  commutetimer.establish_transit_mode_click_handlers();
+  // set up click handlers for transit mode buttons
+  for (var i=0;i<settings.modes.length;i++)
+  {
+    var elem = document.createElement("input");
+    elem.type = "button";
+    elem.value = settings.modes[i][0];
+    elem.className = "btn btn-mode";
+    elem.onclick = function (ev) {
+      commutetimer.transit_mode_click_handler(this.value);
+    };
+    commutetimer.div_transit_mode_buttons.appendChild(elem);
+  }
+  // restore potential state from localStorage
   commutetimer.thaw_state();
   return commutetimer;
 }
+function SettingsHandler() {
+  var settingshandler = {
+    /* default transportation modes */
+    settings_version: 0,
+    modes: Localism("default_modes"),
+    mode_map: {},
+    table_mode_table: document.getElementById("mode-table"),
+    populate_mode_table: function () {
+      var table = this.table_mode_table;
+      table.innerHTML = "";
+      for (var i=0;i<this.modes.length;i++)
+      {
+        var row = table.insertRow(table.rows.length)
+        var label = document.createElement("input");
+        label.type = "text";
+        label.value = this.modes[i][0];
+        var verb = document.createElement("input");
+        verb.type = "text";
+        verb.value = this.modes[i][1];
+        var phrase = document.createElement("input");
+        phrase.type = "text";
+        phrase.value = this.modes[i][2];
+        var up = document.createElement("a");
+        up.innerHTML = "&#x25B2;";
+        up.onclick = function () {
+          var row = this.parentNode.parentNode,
+              sibling = row.previousElementSibling,
+              parent = row.parentNode;
+
+          parent.insertBefore(row, sibling);
+        }
+        var down = document.createElement("a");
+        down.innerHTML = "&#x25BC;"
+        down.onclick = function () {
+          var row = this.parentNode.parentNode,
+              sibling = row.nextElementSibling,
+              parent = row.parentNode;
+          if (sibling) {
+            if (!sibling.nextElementSibling) {
+              // why doesn't javascript have an insertAfter?
+              parent.appendChild(row);
+              return;
+            } else {
+              sibling = sibling.nextElementSibling;
+            }
+          } else {
+            // wraparound on last row
+            sibling = parent.children[0];
+          }
+          parent.insertBefore(row, sibling);
+        }
+        var cell = row.insertCell(0);
+        cell.appendChild(label);
+        cell = row.insertCell(1);
+        cell.appendChild(verb);
+        cell = row.insertCell(2);
+        cell.appendChild(phrase);
+        cell = row.insertCell(3);
+        cell.appendChild(up);
+        cell = row.insertCell(4);
+        cell.appendChild(down);
+      }
+    },
+    thaw_settings: function () {
+      if (supportLocalStorage())
+      {
+        try {
+          var fsettings = JSON.parse(window.localStorage["commutetimer_settings"]);
+          if (fsettings && 'settings_version' in fsettings && this.settings_version >= settings['settings_version'])
+          {
+            console.log("Found settings in localStorage, thawing");
+            // copy the state in, this may be a bad idea
+            for (var key in fsettings)
+            {
+              this[key] = fsettings[key];
+            }
+          }
+        } catch (e) {
+          console.log("thaw_settings error thrown: "  + e);
+        }
+      }
+    },
+    freeze_settings: function () {
+      if (supportLocalStorage())
+      {
+        window.localStorage["commutetimer_settings"] = JSON.stringify(this);
+      }
+    },
+  };
+  settingshandler.thaw_settings();
+  settingshandler.populate_mode_table();
+  // create a lookup map keyed on mode name
+  for (var i=0;i<settingshandler.modes.length;i++) {
+    settingshandler.mode_map[settingshandler.modes[i][0]] = settingshandler.modes[i];
+  }
+  return settingshandler;
+}
+var timer_page = document.getElementById('timer-page');
+var settings_page = document.getElementById('settings-page')
 window.onload = function () {
-  var timer_tab_controller = CommuteTimer();
+  var settings_controller = SettingsHandler();
+  var timer_tab_controller = CommuteTimer(settings_controller);
+  settings_page.hidden = true;
   update_current_time();
+  static_localize();
 }

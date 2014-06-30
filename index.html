@@ -19,32 +19,37 @@
 			<div class="cover-container">
 				<div class="masthead clearfix">
 					<div class="inner">
-						<h3 class="masthead-brand">CommuteTimer</h3>
+						<h3 class="masthead-brand">
+							<span id="loc_app_name">CommuteTimer</span>
+						</h3>
 						<ul class="nav masthead-nav">
-							<li class="active"><a href="#timer">Timer</a></li>
-							<li><a href="#data">Data</a></li>
-							<li><a href="#settings">Settings</a></li>
+							<li class="active">
+								<a href="#timer">
+									<span id="loc_timer_tab">Timer</span>
+								</a>
+							</li>
+							<li>
+								<a href="#data">
+									<span id="loc_data_tab">Data</span>
+								</a>
+							</li>
+							<li>
+								<a href="#settings">
+									<span id="loc_settings_tab">Settings</span>
+								</a>
+							</li>
 							<li><p id="current-time"></p></li>
 						</ul>
 					</div>
 				</div>
 				<div id="timer-page">
 					<div class="inner cover">
-						<h1 class="cover-heading" id="main-status">Haven't started yet</h1>
-						<p class="lead" id="main-subtext">Press one of the transit mode buttons below to start timing your commute</p>
+						<h1 class="cover-heading" id="main-status"></h1>
+						<p class="lead" id="main-subtext"></p>
 					</div>
 
 					<div class="inner cover">
-						<div id="transit-mode-buttons">
-							<input class="btn btn-mode" type="button" value="walk">
-							<input class="btn btn-mode" type="button" value="bike">
-							<input class="btn btn-mode" type="button" value="bus">
-							<input class="btn btn-mode" type="button" value="rail">
-							<input class="btn btn-mode" type="button" value="light rail">
-							<input class="btn btn-mode" type="button" value="drive">
-							<input class="btn btn-mode" type="button" value="skate">
-							<input class="btn btn-mode" type="button" value="wait">
-						</div>
+						<div id="transit-mode-buttons"></div>
 					</div>
 
 					<div id="commute-tools" class="inner cover">
@@ -54,10 +59,37 @@
 
 					<div id="commute-status" class="inner cover">
 						<p class="lead">
-							Started at <span id="start-time"></span>.<br>
-							Been commuting for <span id="elapsed-time"></span>.
+							<span id="loc_started_at">Started at</span> <span id="start-time"></span>.<br>
+							<span id="loc_been_commuting">Been commuting for</span> <span id="elapsed-time"></span>.
 						</p>
 					</div>
+					<div class="inner cover">
+						<table id="commute-legs">
+
+						</table>
+					</div>
+				</div>
+
+				<div id="data-page">
+				</div>
+
+				<div id="settings-page">
+					<div class="inner-content cover">
+						<h1><span id="loc_settings_tab">Settings</span></h1>
+						<table id="mode-table">
+							<thead>
+								<tr>
+									<td></td>
+									<td><span id="loc_setting_str_label">label</span></td>
+									<td><span id="loc_setting_str_verb">verb</span></td>
+									<td><span id="loc_setting_str_phrase">phrase</span></td>
+									<td><span id="loc_setting_str_up">up</span></td>
+									<td><span id="loc_setting_str_down">down</span></td>
+								</tr>
+							</thead>
+						</table>
+					</div>
+
 				</div>
 
 				<div class="mastfoot">

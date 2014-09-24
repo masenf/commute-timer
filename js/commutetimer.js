@@ -433,8 +433,25 @@ function SettingsHandler() {
   }
   return settingshandler;
 }
-var timer_page = document.getElementById('timer-page');
-var settings_page = document.getElementById('settings-page')
+function Navigator() {
+  var navigator = {
+    pages = {
+      timer_page: document.getElementById('timer-page'),
+      settings_page: document.getElementById('settings-page')
+    },
+    current_tab: "timer",
+    change_tab: function (to) {
+      if (to == this.current_tab) {
+        return;
+      }
+      var page_elem = this.pages[to + "_page"];
+      if (page_elem) {
+        for (var page in this.)
+      }
+    }
+  };
+  return navigator;
+}
 window.onload = function () {
   var settings_controller = SettingsHandler();
   var timer_tab_controller = CommuteTimer(settings_controller);

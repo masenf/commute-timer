@@ -191,3 +191,14 @@ body {
 input {
   color: #333;
 }
+#more-history {
+  cursor: pointer;
+}
+.history-row {
+  cursor: pointer;
+}
+.history-row div {
+  display: inline;
+  margin-right: 2em;
+}
+

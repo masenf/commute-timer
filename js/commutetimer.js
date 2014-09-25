@@ -74,6 +74,13 @@ function format_time(date_obj) {
          zero_pad_digit(date_obj.getSeconds());
 }
 
+function format_date(date_obj) {
+  /* format a human readable date (Y-m-d) given a js date object */
+  return date_obj.getFullYear() + "-" +
+         zero_pad_digit(date_obj.getMonth()) + "-" +
+         zero_pad_digit(date_obj.getDay());
+}
+
 function format_difference(msec_ts1, msec_ts2) {
   /* format a human readable time interval (H:M:S) from 2 millisecond timestamps */
   var sec = Math.floor((msec_ts2 - msec_ts1) / 1000);
@@ -101,7 +108,31 @@ function update_current_time () {
   p_current_time.innerHTML = format_time(new Date());
   window.setTimeout(update_current_time, 1000);
 }
-function CommuteTimer(settings)
+/* the following three functions build the leg table, which shows
+ * all prior modes of transportation used in the given commute */
+function append_table_leg (table, mode, start_time, duration)
+{
+  var row = table.insertRow(table.rows.length);
+  var mode_cell = row.insertCell(0);
+  mode_cell.innerHTML = mode;
+  var start_time_cell = row.insertCell(1);
+  start_time_cell.innerHTML = start_time;
+  var duration_cell = row.insertCell(2);
+  duration_cell.innerHTML = duration;
+}
+function thaw_rebuild_leg_table (data, table)
+{
+  for (var i=0;i<data.legs.length-1;i++)
+  {
+    var leg = data.legs[i];
+    var next_leg = data.legs[i+1];
+    append_table_leg(table,
+                     leg.mode,
+                     format_time(new Date(leg.start)),
+                     format_difference(leg.start, next_leg.start));
+  }
+}
+function CommuteTimer(settings, data_tab)
 {
   /* CommuteTimer constructor, given a settings object, return the main controller for the 
    * timer portion of the app */
@@ -206,6 +237,7 @@ function CommuteTimer(settings)
        * after 'arriving' */
       this.transit_mode_click_handler("arrive");
       this.data.commute_started = false;
+      this.archive_state();     // persist the data
       this.freeze_state();      // make sure we don't keep the commute going 
       window.clearTimeout(this.timer_handle);
       this.set_status(Localism("arrival_text"));
@@ -229,6 +261,10 @@ function CommuteTimer(settings)
        *  - (re)start timer */
       console.log("click handler for " + mode);
       window.clearTimeout(this.timer_handle);
+
+      if (!this.data.commute_started) {
+        this.reset_state();     // fixes strange behavior when clicking transit modes after arrive
+      }
 
       this.data.legs.push({
         mode : mode,
@@ -275,30 +311,14 @@ function CommuteTimer(settings)
     append_prev_leg: function ()
     {
       var prev_leg = this.data.legs[this.data.legs.length-2]
-      this.append_table_leg(prev_leg.mode,
-                            format_time(new Date(prev_leg.start)),
-                            format_difference(prev_leg.start, now()));
-    },
-    append_table_leg: function (mode, start_time, duration)
-    {
-      var row = this.table_commute_legs.insertRow(this.table_commute_legs.rows.length);
-      var mode_cell = row.insertCell(0);
-      mode_cell.innerHTML = mode;
-      var start_time_cell = row.insertCell(1);
-      start_time_cell.innerHTML = start_time;
-      var duration_cell = row.insertCell(2);
-      duration_cell.innerHTML = duration;
+      append_table_leg(this.table_commute_legs,
+                       prev_leg.mode,
+                       format_time(new Date(prev_leg.start)),
+                       format_difference(prev_leg.start, now()));
     },
     thaw_rebuild_leg_table: function ()
     {
-      for (var i=0;i<this.data.legs.length-1;i++)
-      {
-        var leg = this.data.legs[i];
-        var next_leg = this.data.legs[i+1];
-        this.append_table_leg(leg.mode,
-                              format_time(new Date(leg.start)),
-                              format_difference(leg.start, next_leg.start));
-      }
+      thaw_rebuild_leg_table(this.data, this.table_commute_legs);
     },
     thaw_state: function () {
       if (supportLocalStorage())
@@ -330,6 +350,12 @@ function CommuteTimer(settings)
       }
     },
 
+    archive_state: function () {
+      data_tab.hdata.append(this.data);
+      data_tab.freeze_history();
+      data_tab.prepend_outer_row(this.data);
+    },
+
     abandon_commute: function () {
       console.log("abandoning current commute");
       if (supportLocalStorage())
@@ -350,6 +376,7 @@ function CommuteTimer(settings)
     commutetimer.update_leg_elapsed_time();
     commutetimer.timer_handle = window.setTimeout(commutetimer.timer, 1000);
   };
+  commutetimer.data_tab = data_tab;
   commutetimer.settings = settings;
   commutetimer.reset_state();
   // set up click handlers for transit mode buttons
@@ -368,6 +395,74 @@ function CommuteTimer(settings)
   commutetimer.thaw_state();
   return commutetimer;
 }
+
+function DataHandler() {
+  /* constructor for historical data page */
+  var datahandler = {
+    div_history_table: document.getElementById('history-table'),
+    div_more_history: document.getElementById('more-history'),
+    cache_rows: 2,
+    displayed_rows: 0,
+    hdata: [],
+
+    make_outer_row: function (data) {
+      var start_dobj = new Date(data.legs[0].start);
+      var start_time = format_time(start_dobj);
+      var start_date = format_date(start_dobj);
+      var n_legs = data.legs.length;
+      return "<div class='history-row'><div>" + start_date + " " + start_time + "</div>" +
+             "<div>" + n_legs + " legs</div></div>";
+    },
+    prepend_outer_row: function (data) {
+      this.div_history_table.innerHTML = this.make_outer_row(data) + this.div_history_table.innerHTML;
+    },
+    append_outer_row: function (data) {
+      this.div_history_table.innerHTML += this.make_outer_row(data);
+    },
+
+    build_outer_table: function () {
+      var display_from = this.hdata.length-1 - this.displayed_rows;
+      if (display_from < 0) {
+        this.div_more_history.hidden = true;      // no more history
+        return
+      }
+      var display_to = display_from - this.cache_rows;
+      if (display_to < 0) {
+        display_to = 0;
+        this.div_more_history.hidden = true;      // no more history
+      }
+      for (var i=display_from; i>=display_to; i--) {
+        this.append_outer_row(this.hdata[i]); 
+        this.displayed_rows += 1;
+      }
+    },
+
+    thaw_history: function () {
+      if (supportLocalStorage())
+      {
+        try {
+          this.hdata = JSON.parse(window.localStorage["commutetimer_history"]);
+        } catch (e) {
+          console.log("thaw_history error thrown: "  + e);
+        }
+      }
+    },
+    freeze_history: function () {
+      if (supportLocalStorage())
+      {
+        this.hdata[hdata.length] = this.data;
+        window.localStorage["commutetimer_history"] = JSON.stringify(this.hdata);
+      }
+    }
+  };
+
+  datahandler.thaw_history();
+  datahandler.build_outer_table();
+  datahandler.div_more_history.onclick = function () { datahandler.build_outer_table(); };
+  return datahandler;
+}
+
+
 function SettingsHandler() {
   var settingshandler = {
     settings_version: 0,
@@ -517,7 +612,8 @@ function Navigator() {
 }
 window.onload = function () {
   var settings_controller = SettingsHandler();
-  var timer_tab_controller = CommuteTimer(settings_controller);
+  var data_tab_controller = DataHandler();
+  var timer_tab_controller = CommuteTimer(settings_controller, data_tab_controller);
   nav = Navigator()
   // resume to the proper location
   if (window.location.hash) {

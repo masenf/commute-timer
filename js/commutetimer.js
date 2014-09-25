@@ -56,6 +56,7 @@ function supportLocalStorage() {
   }
 }
 function now () {
+  /* return the unix timestamp (in millis) corresponding to right now (browser time) */
   var d = new Date();
   return d.getTime();
 }
@@ -67,12 +68,14 @@ function zero_pad_digit(val) {
   }
 }
 function format_time(date_obj) {
+  /* format a human readable time (H:M:S) given a js date object */
   return zero_pad_digit(date_obj.getHours()) + ":" +
          zero_pad_digit(date_obj.getMinutes()) + ":" +
          zero_pad_digit(date_obj.getSeconds());
 }
 
 function format_difference(msec_ts1, msec_ts2) {
+  /* format a human readable time interval (H:M:S) from 2 millisecond timestamps */
   var sec = Math.floor((msec_ts2 - msec_ts1) / 1000);
   var hours = Math.floor(sec / 3600);
   sec = sec % 3600;
@@ -92,16 +95,20 @@ function format_difference(msec_ts1, msec_ts2) {
   return output;
 }
 function update_current_time () {
+  /* 'recursively' called function to update the current-time span each second to 
+   * simulate a ticking clock */
   var p_current_time = document.getElementById('current-time');
   p_current_time.innerHTML = format_time(new Date());
   window.setTimeout(update_current_time, 1000);
 }
 function CommuteTimer(settings)
 {
+  /* CommuteTimer constructor, given a settings object, return the main controller for the 
+   * timer portion of the app */
   var commutetimer = {
     support_data_version: 0,
     data: {},
-    timer_handle: -1,
+    timer_handle: -1,       // for canceling the loop
     div_main_status: document.getElementById('main-status'),
     div_main_subtext: document.getElementById('main-subtext'),
     div_commute_status: document.getElementById('commute-status'),
@@ -115,7 +122,12 @@ function CommuteTimer(settings)
 
     timer: function () {},
 
-    update_start_time: function () {
+    /* The following update_* functions take information from this.data
+     * and update the associated DOM element
+     * These functions are usually called on timer update, but
+     * can be triggered by user events */
+
+    update_start_time: function () {            // called once per commute to update the start time
       if (this.data.commute_started) {
         var start_time = this.data.legs[0].start;
         var date_obj = new Date(start_time);
@@ -123,14 +135,14 @@ function CommuteTimer(settings)
       }
     },
 
-    update_elapsed_time: function () {
+    update_elapsed_time: function () {          // called each second or so to simulate ticking
       if (this.data.commute_started) {
         var start_time = this.data.legs[0].start;
         this.span_elapsed_time.innerHTML = format_difference(start_time, now());
       }
     },
 
-    update_leg_mode: function () {
+    update_leg_mode: function () {              // called when the mode of transportation is changed
       if (this.data.commute_started) {
         var mode = this.data.legs[this.data.legs.length-1].mode;
         var modeline = this.settings.mode_map[mode];
@@ -142,7 +154,7 @@ function CommuteTimer(settings)
       }
     },
 
-    update_leg_elapsed_time: function () {
+    update_leg_elapsed_time: function () {      // called each second or so to simulate ticking
       if (this.data.commute_started) {
         var leg_start_time = this.data.legs[this.data.legs.length-1].start;
         var mode = this.data.legs[this.data.legs.length-1].mode;
@@ -158,14 +170,24 @@ function CommuteTimer(settings)
       }
     },
 
-    set_status: function (status) {
+    show_status: function() {
+      this.div_commute_status.hidden = false;
+      this.div_commute_tools.hidden = false;
+    },
+
+    hide_status: function () {
+      this.div_commute_status.hidden = true;
+      this.div_commute_tools.hidden = true;
+    },
+
+    set_status: function (status) {             // update the main bold message
       if (status) {
         this.data.status_message = status;
       }
       this.div_main_status.innerHTML = this.data.status_message;
     },
 
-    set_subtext: function (subtext) {
+    set_subtext: function (subtext) {           // update the smaller info message
       if (subtext) {
         this.data.subtext = subtext;
       }
@@ -178,20 +200,33 @@ function CommuteTimer(settings)
       this.show_status();
     },
     arrive_commute: function () {
+      /* called to graciously end the commute, save data and update text 
+       * to indicate arrival.
+       * also updates the button labels to reflect the options to the user
+       * after 'arriving' */
       this.transit_mode_click_handler("arrive");
       this.data.commute_started = false;
+      this.freeze_state();      // make sure we don't keep the commute going 
       window.clearTimeout(this.timer_handle);
       this.set_status(Localism("arrival_text"));
       this.set_subtext(Localism("arrival_subtext"));
+      //
+      // after arriving, the arrive button becomes a reset
       this.btn_arrive.value = Localism("btn_reset");
       var parent = this;
       this.btn_arrive.onclick = function () {
-        parent.abandon_commute();
+        parent.abandon_commute();       // the data is already saved, so abandon == reset
       };
       this.btn_abandon.disabled = true;
     },
 
     transit_mode_click_handler: function (mode) {
+      /* onclick handler for all transit mode buttons.
+       *  - start the commute if not started
+       *  - save time of click
+       *  - update table of previous legs
+       *  - persist state
+       *  - (re)start timer */
       console.log("click handler for " + mode);
       window.clearTimeout(this.timer_handle);
 
@@ -211,16 +246,8 @@ function CommuteTimer(settings)
       this.freeze_state();
     },
 
-    show_status: function() {
-      this.div_commute_status.hidden = false;
-      this.div_commute_tools.hidden = false;
-    },
-
-    hide_status: function () {
-      this.div_commute_status.hidden = true;
-      this.div_commute_tools.hidden = true;
-    },
     reset_state: function () {
+      /* initialize app to default state / clear data */
       this.data = {
         data_version: 0,
         commute_started: false,
@@ -242,6 +269,9 @@ function CommuteTimer(settings)
       this.table_commute_legs.innerHTML = "";
       this.hide_status();
     },
+
+    /* the following three functions build the leg table, which shows
+     * all prior modes of transportation used in this commute */
     append_prev_leg: function ()
     {
       var prev_leg = this.data.legs[this.data.legs.length-2]
@@ -313,6 +343,8 @@ function CommuteTimer(settings)
     }
   };
   commutetimer.timer = function () {
+    /* function is defined outside of the instance to avoid circular dep.
+     * problems */
     commutetimer.update_elapsed_time();
     commutetimer.update_leg_mode();
     commutetimer.update_leg_elapsed_time();
@@ -338,7 +370,6 @@ function CommuteTimer(settings)
 }
 function SettingsHandler() {
   var settingshandler = {
-    /* default transportation modes */
     settings_version: 0,
     modes: Localism("default_modes"),
     mode_map: {},
@@ -434,28 +465,67 @@ function SettingsHandler() {
   return settingshandler;
 }
 function Navigator() {
-  var navigator = {
-    pages = {
-      timer_page: document.getElementById('timer-page'),
-      settings_page: document.getElementById('settings-page')
+  var nav = {
+    pages : {
+      timer: document.getElementById('timer-page'),
+      data: document.getElementById('data-page'),
+      settings: document.getElementById('settings-page')
     },
-    current_tab: "timer",
+    links : {
+      timer: document.getElementById('timer-link'),
+      data: document.getElementById('data-link'),
+      settings: document.getElementById('settings-link')
+    },
+    current_tab: undefined,
     change_tab: function (to) {
       if (to == this.current_tab) {
         return;
       }
-      var page_elem = this.pages[to + "_page"];
-      if (page_elem) {
-        for (var page in this.)
+      var prev_page = document.getElementById(this.current_tab + "-page");
+      var prev_link = document.getElementById(this.current_tab + "-link");
+      var next_page = document.getElementById(to + "-page");
+      var next_link = document.getElementById(to + "-link");
+      if (prev_page) {
+          prev_page.hidden = true;
       }
+      if (prev_link) {
+          prev_link.classList.remove("active");
+      }
+      if (next_page) {
+          next_page.hidden = false;
+      }
+      if (next_link) {
+          next_link.classList.add("active");
+      }
+      this.current_tab = to;
+      window.location.hash = "#" + to;
     }
   };
-  return navigator;
+
+  // hide all pages at the start
+  for (var page in nav.pages) {
+      nav.pages[page].hidden = true;
+  }
+
+  // set hash change listener for navigation links
+  window.onhashchange = function () {
+    var target = window.location.hash.substr(1);
+    nav.change_tab(target);
+  };
+
+  return nav;
 }
 window.onload = function () {
   var settings_controller = SettingsHandler();
   var timer_tab_controller = CommuteTimer(settings_controller);
-  settings_page.hidden = true;
+  nav = Navigator()
+  // resume to the proper location
+  if (window.location.hash) {
+      nav.change_tab(window.location.hash.substr(1));
+  } else {
+      // default to timer tab
+      nav.change_tab("timer");
+  }
   update_current_time();
   static_localize();
 }

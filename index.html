@@ -10,108 +10,127 @@
 	<title>CommuteTimer</title>
 
   <link href="css/bootstrap.min.css" rel="stylesheet">
-  <link href="css/cover.css" rel="stylesheet">
+  <link href="css/redux.css" rel="stylesheet">
 	<script language="javascript" src="js/commutetimer.js"></script>
+	<script language="template" type="text/template" id="outer-row-template">
+		<div class="history-row panel panel-dark" id="{{key}}">
+		  <div class="panel-heading">
+		    <span class="panel-title">{{start_date}} {{start_time}}</span>
+				<div class='history-row-delete'>X</div>
+		  </div>
+		  <div class="panel-body">
+		    <div class="left-status-float">{{n_legs}} {{leg_string}}</div>
+				<div class="right-status-float">{{total_length}}</div>
+		  </div>
+			<table class="table leg_table">
+			</table>
+		</div>
+	</script>
+	<script language="javascript">
+		// the "i don't want to include jquery" hacks
+		function nav_collapse_boo() {
+			var nav_collapse = document.getElementsByClassName("navbar-collapse");
+			for (var i=0; i<nav_collapse.length; i++) {
+				var this_nav = nav_collapse[i];
+				if (this_nav.classList.contains("collapse")) {
+					this_nav.classList.remove("collapse");
+				} else {
+					this_nav.classList.add("collapse");
+				}
+			}
+		}
+		function nav_collapse_reset() {
+			var nav_collapse = document.getElementsByClassName("navbar-collapse");
+			for (var i=0; i<nav_collapse.length; i++) {
+				nav_collapse[i].classList.add("collapse");
+			}
+		}
+	</script>
 </head>
 <body>
-	<div class="site-wrapper">
-		<div class="site-wrapper-inner">
-			<div class="cover-container">
-				<div class="masthead clearfix">
-					<div class="inner">
-						<h3 class="masthead-brand">
-							<span id="loc_app_name">CommuteTimer</span>
-						</h3>
-						<ul class="nav masthead-nav">
-							<li id="timer-link">
-								<a href="#timer">
-									<span id="loc_timer_tab">Timer</span>
-								</a>
-							</li>
-							<li id="data-link">
-								<a href="#data">
-									<span id="loc_data_tab">Data</span>
-								</a>
-							</li>
-							<li id="settings-link">
-								<a href="#settings">
-									<span id="loc_settings_tab">Settings</span>
-								</a>
-							</li>
-							<li><p id="current-time"></p></li>
-						</ul>
-					</div>
-				</div>
-				<div id="timer-page">
-					<div class="inner cover">
-						<h1 class="cover-heading" id="main-status"></h1>
-						<p class="lead" id="main-subtext"></p>
-					</div>
 
-					<div class="inner cover">
-						<div id="transit-mode-buttons"></div>
-					</div>
+  <div class="navbar navbar-default navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" onclick="nav_collapse_boo();">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="#timer" onclick="nav_collapse_reset();">CommuteTimer</a>
+      </div>
+      <div class="navbar-collapse collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="#data" onclick="nav_collapse_boo();">Data</a></li>
+          <li><a href="#settings" onclick="nav_collapse_boo();">Settings</a></li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+		<div class="navbar-status">
+			<span class="left-status-float" id="main-status"></span>
+			<span class="right-status-float" id="main-subtext"></span>
+		</div>
+  </div>
 
-					<div id="commute-tools" class="inner cover">
-						<input id="btn-arrive" class="btn btn-success" type="button" value="Arrival">
-						<input id="btn-abandon" class="btn btn-danger" type="button" value="Abandon">
-					</div>
+	<div id="timer-page">
+		<div class="inner cover">
+			<div id="transit-mode-buttons"></div>
+		</div>
 
-					<div id="commute-status" class="inner cover">
-						<p class="lead">
-							<span id="loc_started_at">Started at</span> <span id="start-time"></span>.<br>
-							<span id="loc_been_commuting">Been commuting for</span> <span id="elapsed-time"></span>.
-						</p>
-					</div>
-					<div class="inner cover">
-						<table id="commute-legs">
+		<div id="commute-tools" class="inner cover">
+			<span id="loc_started_at">Started at</span> <span id="start-time"></span><br>
+			<input id="btn-arrive" class="btn btn-success" type="button" value="Arrival">
+			<input id="btn-abandon" class="btn btn-danger" type="button" value="Abandon">
+		</div>
 
-						</table>
-					</div>
-				</div>
+		<div>
+			<table id="commute-legs">
 
-				<div id="data-page">
-					<div class="inner-content cover">
-						<h1><span id="loc_data_tab">History</span></h1>
-                        <div id="history-table">
+			</table>
+		</div>
+	</div>
 
-                        </div>
-                        <div id="more-history">
-                        More...
-                        </div>
-                    </div>
-				</div>
+	<div class="inner-content" id="data-page">
+		<span class="tab-header" id="loc_data_tab">History</span>
+    <div id="history-table">
 
-				<div id="settings-page">
-					<div class="inner-content cover">
-						<h1><span id="loc_settings_tab">Settings</span></h1>
-						<table id="mode-table">
-							<thead>
-								<tr>
-									<td></td>
-									<td><span id="loc_setting_str_label">label</span></td>
-									<td><span id="loc_setting_str_verb">verb</span></td>
-									<td><span id="loc_setting_str_phrase">phrase</span></td>
-									<td><span id="loc_setting_str_up">up</span></td>
-									<td><span id="loc_setting_str_down">down</span></td>
-								</tr>
-							</thead>
-						</table>
-					</div>
+    </div>
+    <div id="more-history">
+    More...
+    </div>
+	</div>
 
-				</div>
+	<div class="inner-content" id="settings-page">
+		<span class="tab-header" id="loc_settings_tab">Settings</span>
+		<table id="mode-table">
+			<thead>
+				<tr>
+					<td></td>
+					<td><span id="loc_setting_str_label">label</span></td>
+					<td><span id="loc_setting_str_verb">verb</span></td>
+					<td><span id="loc_setting_str_phrase">phrase</span></td>
+					<td><span id="loc_setting_str_up">up</span></td>
+					<td><span id="loc_setting_str_down">down</span></td>
+				</tr>
+			</thead>
+		</table>
+	</div>
 
-				<div class="mastfoot">
-					<div class="inner">
-						<p>Created by <a href="http://masenf.com">@masenf</a>, 2014</p>
-						<p>Powered by <a href="http://getbootstrap.com">Bootstrap</a></p>
-					</div>
-				</div>
+	<div id="footer">
+		<p>Created by <a href="http://masenf.com">@masenf</a>, 2014</p>
+	</div>
+	<div class="navbar-inverse navbar-fixed-bottom">
+		<div class="container">
+			<div class="left-status-float">
+				<span id="loc_current_time">Current time</span><br>
+				<span id="current-time"></span>
+			</div>
+			<div class="right-status-float" id="commute-status">
+				<span id="loc_been_commuting">Been commuting for</span><br>
+				<span id="elapsed-time"></span>
 			</div>
 		</div>
 	</div>
-<center>
-
-</center>
 </body>
 </html>

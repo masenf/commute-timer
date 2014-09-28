@@ -5,14 +5,17 @@ function Localism(key, locale) {
     app_name: "CommuteTimer",
     arrival_text: "You are arrived",
     arrival_subtext: "Remember to have a nice day",
-    been_commuting: "Been commuting for",
+    been_commuting: "Commute time",
     btn_abandon: "Abandon",
     btn_arrive: "Arrival",
+    btn_delete: "X",
     btn_reset: "Reset",
-    data_tab: "Datar",
+    btn_undo: "Undo",
+    current_time: "Wall time",
+    data_tab: "Data",
     en_route: "En route via",
-    prestart_text: "Haven't started yet",
-    prestart_subtext: "Press one of the transit mode buttons below to start timing your commute",
+    prestart_text: "",
+    prestart_subtext: "",
     default_modes: [
       ['walk', 'walking', 'on foot'],
       ['bike', 'biking', 'pedaling'],
@@ -54,6 +57,16 @@ function supportLocalStorage() {
   } catch (e) {
     return false;
   }
+}
+function template(tmpl_id, replacements) {
+  var tmpl = document.getElementById(tmpl_id).innerHTML;
+  for (var rkey in replacements) {
+    var search = "{{" + rkey + "}}";
+    tmpl = tmpl.replace(search, replacements[rkey]);
+  }
+  var dom_el = document.createElement('div');
+  dom_el.innerHTML = tmpl;
+  return dom_el.childNodes[1];
 }
 function now () {
   /* return the unix timestamp (in millis) corresponding to right now (browser time) */
@@ -102,7 +115,7 @@ function format_difference(msec_ts1, msec_ts2) {
   return output;
 }
 function update_current_time () {
-  /* 'recursively' called function to update the current-time span each second to 
+  /* 'recursively' called function to update the current-time span each second to
    * simulate a ticking clock */
   var p_current_time = document.getElementById('current-time');
   p_current_time.innerHTML = format_time(new Date());
@@ -134,7 +147,7 @@ function thaw_rebuild_leg_table (data, table)
 }
 function CommuteTimer(settings, data_tab)
 {
-  /* CommuteTimer constructor, given a settings object, return the main controller for the 
+  /* CommuteTimer constructor, given a settings object, return the main controller for the
    * timer portion of the app */
   var commutetimer = {
     support_data_version: 1,
@@ -231,14 +244,14 @@ function CommuteTimer(settings, data_tab)
       this.show_status();
     },
     arrive_commute: function () {
-      /* called to graciously end the commute, save data and update text 
+      /* called to graciously end the commute, save data and update text
        * to indicate arrival.
        * also updates the button labels to reflect the options to the user
        * after 'arriving' */
       this.transit_mode_click_handler("arrive");
       this.data.commute_started = false;
       this.archive_state();     // persist the data
-      this.freeze_state();      // make sure we don't keep the commute going 
+      this.freeze_state();      // make sure we don't keep the commute going
       window.clearTimeout(this.timer_handle);
       this.set_status(Localism("arrival_text"));
       this.set_subtext(Localism("arrival_subtext"));
@@ -380,6 +393,8 @@ function CommuteTimer(settings, data_tab)
   commutetimer.data_tab = data_tab;
   commutetimer.settings = settings;
   commutetimer.reset_state();
+  commutetimer.set_status();
+  commutetimer.set_subtext();
   // set up click handlers for transit mode buttons
   for (var i=0;i<settings.modes.length;i++)
   {
@@ -423,7 +438,7 @@ function DataHandler() {
     table_click_handler: function (data, table) {
       table.hidden = true;
       var first_click = true;
-      return function () { 
+      return function () {
         console.log("clicked on " + data.key);
         if (first_click) {
           thaw_rebuild_leg_table(data, table);
@@ -444,47 +459,45 @@ function DataHandler() {
         if (!deleted) {
           hdata_index = outer.delete_item_by_uuid(data.key);
           info_div.classList.add("strikeout");
-          delete_btn.innerHTML = "Undo";
+          delete_btn.innerHTML = Localism("btn_undo");
           deleted = true;
         } else {
           outer.hdata.splice(hdata_index, 0, data);
           outer.freeze_history();
           info_div.classList.remove("strikeout");
-          delete_btn.innerHTML = "X";
+          delete_btn.innerHTML = Localism("btn_delete");
           deleted = false;
         }
       };
     },
     make_outer_row: function (data) {
       var start_dobj = new Date(data.legs[0].start);
-      var start_time = format_time(start_dobj);
-      var start_date = format_date(start_dobj);
-      var total_length = format_difference(data.legs[0].start,
-                                           data.legs[data.legs.length-1].start);
-      var n_legs = data.legs.length - 1;
-      var leg_string = (n_legs > 1) ? "legs" : "leg";
-      var row = document.createElement("div");
-      row.setAttribute("id", data.key);
-      row.className = "history-row";
-      row.innerHTML = "<div class='history-row-info'>" +
-                      "<div>" + start_date + " " + start_time + "</div>" +
-                      "<div>" + n_legs + " " + leg_string + "</div>" +
-                      "<div>" + total_length + "</div>" +
-                      "</div><div class='history-row-delete'>X</div>" +
-                      "<table class='leg_table'></table>";
-      var info_div = row.getElementsByClassName('history-row-info')[0];
+      var repls = {
+        key: data.key,
+        start_time: format_time(start_dobj),
+        start_date: format_date(start_dobj),
+        total_length: format_difference(data.legs[0].start,
+                                        data.legs[data.legs.length-1].start),
+        n_legs: data.legs.length - 1
+      };
+      repls.leg_string = (repls.n_legs > 1) ? "legs" : "leg";
+      var row = template("outer-row-template", repls);
+      var title = row.getElementsByClassName('panel-title')[0];
+      var body = row.getElementsByClassName('panel-body')[0];
       var delete_btn = row.getElementsByClassName('history-row-delete')[0];
 
       // set up on click events for expanding the leg table and deleteing the trip
-      info_div.onclick = this.table_click_handler(data, row.getElementsByTagName('table')[0]);
-      delete_btn.onclick = this.delete_click_handler(data, delete_btn, info_div);
+      var actual_handler = this.table_click_handler(data, row.getElementsByTagName('table')[0]);
+      title.onclick = actual_handler;
+      body.onclick = actual_handler;
+      delete_btn.onclick = this.delete_click_handler(data, delete_btn, title);
       console.log("set up handler for " + data.key);
 
       return row;
     },
     prepend_outer_row: function (data) {
       if (this.div_history_table.childNodes.length > 0) {
-        this.div_history_table.insertBefore(this.make_outer_row(data), 
+        this.div_history_table.insertBefore(this.make_outer_row(data),
                                             this.div_history_table.childNodes[0]);
       } else {
         this.append_outer_row(data);
@@ -506,7 +519,7 @@ function DataHandler() {
         this.div_more_history.hidden = true;      // no more history
       }
       for (var i=display_from; i>=display_to; i--) {
-        this.append_outer_row(this.hdata[i]); 
+        this.append_outer_row(this.hdata[i]);
         this.displayed_rows += 1;
       }
     },

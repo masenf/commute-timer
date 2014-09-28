@@ -202,3 +202,11 @@ input {
   margin-right: 2em;
 }
 
+.leg_table td {
+  padding-right: 0.75em; 
+  padding-left: 0.75em; 
+}
+
+.strikeout {
+  text-decoration: line-through;
+}
